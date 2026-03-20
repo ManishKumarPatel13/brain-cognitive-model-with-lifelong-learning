@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Brain Monitor Dashboard"
+version = "1.0.0"
+id = "artifacts/brain-monitor"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23309
+
+[services.development]
+run = "pnpm --filter @workspace/brain-monitor run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/brain-monitor", "run", "build" ]
+publicDir = "artifacts/brain-monitor/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23309"
+BASE_PATH = "/"
