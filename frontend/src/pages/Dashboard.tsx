@@ -48,6 +48,10 @@ const workingMemoryData = {
   ],
 };
 
+const systemPromptDefault = `You are COGNITEX-AI, an intelligent assistant monitoring a cognitive architecture system. 
+You help analyze working memory, semantic relationships, and episodic memory patterns. 
+Provide concise, technical responses focused on system diagnostics and optimization.`;
+
 const healthData = [
   { episode: 0, Task_A_Accuracy: 98, Task_B_Accuracy: 10 },
   { episode: 10, Task_A_Accuracy: 85, Task_B_Accuracy: 45 },
@@ -333,38 +337,74 @@ export default function Dashboard() {
   const [input, setInput] = useState("");
   const [sleeping, setSleeping] = useState(false);
   const [sleepProgress, setSleepProgress] = useState(0);
+  const [currentPrompt, setCurrentPrompt] = useState("");
+  const [systemPrompt, setSystemPrompt] = useState("");
+  const [lastAPICall, setLastAPICall] = useState<{ timestamp: string; status: string }>({ timestamp: "", status: "" });
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const trimmed = input.trim();
     if (!trimmed) return;
 
     const userMsg: Message = { id: Date.now(), role: "user", content: trimmed };
-    const aiResponses: Message[] = [
-      {
+    setMessages((prev) => [...prev, userMsg]);
+    setInput("");
+    setCurrentPrompt(trimmed);
+
+    try {
+      console.log("🔄 Sending message to API:", trimmed);
+      const response = await fetch("http://localhost:8000/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text: trimmed }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("✓ Received from API:", data);
+      
+      // Update working memory with prompt details
+      if (data.system_prompt) {
+        setSystemPrompt(data.system_prompt);
+      }
+      setLastAPICall({
+        timestamp: new Date().toLocaleTimeString(),
+        status: data.status,
+      });
+
+      const aiMsg: Message = {
         id: Date.now() + 1,
         role: "ai",
-        content:
-          "Analyzing your query against the Semantic Memory graph. The relevant nodes are FastAPI → CORS → React. Based on episodic clusters, this pattern matches 3 prior API_Errors. Recommended: verify `allow_origins` includes your current dev host.",
-        source: "Semantic DB",
+        content: data.response,
+        source: "Gemini API",
         liked: null,
-      },
-      {
-        id: Date.now() + 2,
+      };
+      console.log("Adding AI message:", aiMsg);
+      setMessages((prev) => [...prev, aiMsg]);
+    } catch (error) {
+      console.error("❌ Error:", error);
+      setLastAPICall({
+        timestamp: new Date().toLocaleTimeString(),
+        status: "error",
+      });
+      const errorMsg: Message = {
+        id: Date.now() + 1,
         role: "ai",
-        content:
-          "Working Memory updated. Context window loaded with CORS resolution pattern. Attention weights recalibrated: [cors: 0.91, origins: 0.87]. Ready for next directive.",
-        source: "Working Memory",
+        content: `Error communicating with backend: ${error instanceof Error ? error.message : "Unknown error"}`,
+        source: "Error Handler",
         liked: null,
-      },
-    ];
-
-    setMessages((prev) => [...prev, userMsg, aiResponses[Math.floor(Math.random() * aiResponses.length)]]);
-    setInput("");
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    }
   };
 
   const handleLike = (id: number, val: boolean) => {
@@ -493,12 +533,25 @@ export default function Dashboard() {
               </span>
               <span className="ml-auto flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
-                <span className="text-[10px] text-violet-400 font-mono">{workingMemoryData.system_state}</span>
+                <span className="text-[10px] text-violet-400 font-mono">active_processing</span>
               </span>
             </div>
             <div className="flex-1 overflow-y-auto p-4 min-h-0">
               <div className="bg-neutral-950 border border-neutral-800 rounded-lg p-3 font-mono text-[11px] leading-5">
-                <JsonToken value={workingMemoryData} />
+                <JsonToken value={{
+                  system_state: "active_processing",
+                  last_api_call: lastAPICall,
+                  current_task: currentPrompt || "idle",
+                  system_prompt: systemPrompt || systemPromptDefault,
+                  active_context: [
+                    {
+                      role: "user",
+                      content: currentPrompt || "No prompt sent yet",
+                    },
+                  ],
+                  api_model: "gemini-pro",
+                  api_status: lastAPICall.status || "awaiting_input",
+                }} />
               </div>
             </div>
           </div>
