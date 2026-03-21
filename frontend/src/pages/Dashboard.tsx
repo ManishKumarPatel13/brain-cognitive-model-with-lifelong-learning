@@ -100,21 +100,7 @@ type Message = {
   liked?: boolean | null;
 };
 
-const initialMessages: Message[] = [
-  {
-    id: 1,
-    role: "user",
-    content: "Why is my Next.js frontend getting blocked by the backend?",
-  },
-  {
-    id: 2,
-    role: "ai",
-    content:
-      "The issue is a CORS policy violation. Your FastAPI backend on port 8000 is not permitting requests from http://localhost:3000. I've retrieved your past CORS configurations from Episodic DB — you previously resolved this by adding the origin to `allow_origins`. Add `CORSMiddleware` with `allow_origins=[\"http://localhost:3000\"]`.",
-    source: "Episodic DB",
-    liked: null,
-  },
-];
+const initialMessages: Message[] = [];
 
 function JsonToken({ value, depth = 0 }: { value: unknown; depth?: number }) {
   if (value === null) return <span className="text-rose-400">null</span>;
