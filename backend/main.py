@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 import google.generativeai as genai
 import logging
 from sentence_transformers import SentenceTransformer
-from pinecone import Pinecone
+from pinecone import Pinecone, ServerlessSpec
 from datetime import datetime
 import json
 
@@ -34,8 +34,15 @@ PINECONE_ENVIRONMENT = os.getenv("PINECONE_ENVIRONMENT")
 if not PINECONE_API_KEY or not PINECONE_ENVIRONMENT:
     raise ValueError("PINECONE_API_KEY or PINECONE_ENVIRONMENT not set")
 
+print(f"✓ Pinecone API Key loaded (first 10 chars): {PINECONE_API_KEY[:10]}...")
+print(f"✓ Pinecone Environment: {PINECONE_ENVIRONMENT}")
 print(f"✓ Connecting to Pinecone...")
-pc = Pinecone(api_key=PINECONE_API_KEY)
+try:
+    pc = Pinecone(api_key=PINECONE_API_KEY)
+except Exception as e:
+    print(f"✗ Pinecone connection error: {e}")
+    raise
+
 
 # Get or create index
 INDEX_NAME = "brain-monitor-memory"
@@ -47,7 +54,8 @@ except Exception as e:
     pc.create_index(
         name=INDEX_NAME,
         dimension=384,  # dimension of sentence-transformers/all-MiniLM-L6-v2
-        metric="cosine"
+        metric="cosine",
+        spec=ServerlessSpec(cloud="gcp", region="us-west1")
     )
     index = pc.Index(INDEX_NAME)
 
