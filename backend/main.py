@@ -51,13 +51,17 @@ try:
     print(f"✓ Connected to Pinecone index: {INDEX_NAME}")
 except Exception as e:
     print(f"⚠️  Creating new Pinecone index: {INDEX_NAME}")
-    pc.create_index(
-        name=INDEX_NAME,
-        dimension=384,  # dimension of sentence-transformers/all-MiniLM-L6-v2
-        metric="cosine",
-        spec=ServerlessSpec(cloud="gcp", region="us-west1")
-    )
-    index = pc.Index(INDEX_NAME)
+    try:
+        pc.create_index(
+            name=INDEX_NAME,
+            dimension=384,  # dimension of sentence-transformers/all-MiniLM-L6-v2
+            metric="cosine",
+            spec=ServerlessSpec(cloud="aws", region="us-east-1")  # AWS Virginia
+        )
+        index = pc.Index(INDEX_NAME)
+    except Exception as create_error:
+        print(f"✗ Failed to create index: {create_error}")
+        raise
 
 # Load embedding model
 print(f"✓ Loading embedding model...")
