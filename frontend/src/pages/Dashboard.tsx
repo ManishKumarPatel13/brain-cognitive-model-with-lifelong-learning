@@ -24,6 +24,9 @@ import {
   RefreshCw,
 } from "lucide-react";
 
+// Configure backend URL (supports both local dev and deployed backend)
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+
 const workingMemoryData = {
   system_state: "active_processing",
   current_task: "resolve_cors_policy",
@@ -340,6 +343,9 @@ export default function Dashboard() {
   const [currentPrompt, setCurrentPrompt] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
   const [lastAPICall, setLastAPICall] = useState<{ timestamp: string; status: string }>({ timestamp: "", status: "" });
+  const [memoryContext, setMemoryContext] = useState("");
+  const [pastInteractions, setPastInteractions] = useState<any[]>([]);
+  const [memorySearchCount, setMemorySearchCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -357,7 +363,7 @@ export default function Dashboard() {
 
     try {
       console.log("🔄 Sending message to API:", trimmed);
-      const response = await fetch("http://localhost:8000/api/chat", {
+      const response = await fetch(`${BACKEND_URL}/api/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -376,6 +382,22 @@ export default function Dashboard() {
       if (data.system_prompt) {
         setSystemPrompt(data.system_prompt);
       }
+      
+      // Update memory context
+      if (data.context) {
+        setMemoryContext(data.context);
+      }
+      
+      // Update past interactions
+      if (data.past_interactions) {
+        setPastInteractions(data.past_interactions);
+      }
+      
+      // Update memory search count
+      if (data.memory_search_results !== undefined) {
+        setMemorySearchCount(data.memory_search_results);
+      }
+      
       setLastAPICall({
         timestamp: new Date().toLocaleTimeString(),
         status: data.status,
@@ -541,6 +563,13 @@ export default function Dashboard() {
                 <JsonToken value={{
                   system_state: "active_processing",
                   last_api_call: lastAPICall,
+                  memory_system: {
+                    status: "live",
+                    vector_db: "Pinecone",
+                    embeddings_model: "sentence-transformers/all-MiniLM-L6-v2",
+                    past_interactions_retrieved: memorySearchCount,
+                    context_injected: memoryContext ? true : false
+                  },
                   current_task: currentPrompt || "idle",
                   system_prompt: systemPrompt || systemPromptDefault,
                   active_context: [
@@ -549,7 +578,8 @@ export default function Dashboard() {
                       content: currentPrompt || "No prompt sent yet",
                     },
                   ],
-                  api_model: "gemini-pro",
+                  retrieved_memory_context: memorySearchCount > 0 ? pastInteractions.slice(0, 2) : [],
+                  api_model: "gemini-3-flash-preview",
                   api_status: lastAPICall.status || "awaiting_input",
                 }} />
               </div>
