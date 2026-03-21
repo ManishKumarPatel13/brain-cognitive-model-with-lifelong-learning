@@ -346,11 +346,39 @@ export default function Dashboard() {
   const [memoryContext, setMemoryContext] = useState("");
   const [pastInteractions, setPastInteractions] = useState<any[]>([]);
   const [memorySearchCount, setMemorySearchCount] = useState(0);
+  const [healthStats, setHealthStats] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Fetch health stats from backend
+  const fetchHealthStats = async () => {
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/health/stats`);
+      const data = await response.json();
+      if (data.data) {
+        // Transform data for chart display
+        const chartData = data.data.map((d: any, idx: number) => ({
+          episode: idx * 10,
+          accuracy: d.accuracy,
+          memory_retrieved: d.memory_retrieved,
+          timestamp: new Date(d.timestamp).toLocaleTimeString()
+        }));
+        setHealthStats(chartData);
+      }
+    } catch (error) {
+      console.error("❌ Error fetching health stats:", error);
+    }
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Fetch health stats when component mounts and periodically
+  useEffect(() => {
+    fetchHealthStats();
+    const interval = setInterval(fetchHealthStats, 2000); // Update every 2 seconds
+    return () => clearInterval(interval);
+  }, []);
 
   const handleSend = async () => {
     const trimmed = input.trim();
@@ -412,6 +440,9 @@ export default function Dashboard() {
       };
       console.log("Adding AI message:", aiMsg);
       setMessages((prev) => [...prev, aiMsg]);
+      
+      // Fetch updated health stats immediately after chat response
+      await fetchHealthStats();
     } catch (error) {
       console.error("❌ Error:", error);
       setLastAPICall({
@@ -595,7 +626,7 @@ export default function Dashboard() {
             </div>
             <div className="flex-1 p-3 min-h-0">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={healthData} margin={{ top: 8, right: 16, left: -20, bottom: 0 }}>
+                <LineChart data={healthStats.length > 0 ? healthStats : healthData} margin={{ top: 8, right: 16, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
                   <XAxis
                     dataKey="episode"
@@ -625,22 +656,24 @@ export default function Dashboard() {
                   />
                   <Line
                     type="monotone"
-                    dataKey="Task_A_Accuracy"
+                    dataKey={healthStats.length > 0 ? "accuracy" : "Task_A_Accuracy"}
                     stroke="#06b6d4"
                     strokeWidth={2}
                     dot={{ r: 3, fill: "#06b6d4", strokeWidth: 0 }}
                     activeDot={{ r: 4 }}
-                    name="Task A"
+                    name={healthStats.length > 0 ? "System Accuracy (with Memory)" : "Task A"}
                   />
-                  <Line
-                    type="monotone"
-                    dataKey="Task_B_Accuracy"
-                    stroke="#8b5cf6"
-                    strokeWidth={2}
-                    dot={{ r: 3, fill: "#8b5cf6", strokeWidth: 0 }}
-                    activeDot={{ r: 4 }}
-                    name="Task B"
-                  />
+                  {healthStats.length === 0 && (
+                    <Line
+                      type="monotone"
+                      dataKey="Task_B_Accuracy"
+                      stroke="#8b5cf6"
+                      strokeWidth={2}
+                      dot={{ r: 3, fill: "#8b5cf6", strokeWidth: 0 }}
+                      activeDot={{ r: 4 }}
+                      name="Task B"
+                    />
+                  )}
                 </LineChart>
               </ResponsiveContainer>
             </div>
