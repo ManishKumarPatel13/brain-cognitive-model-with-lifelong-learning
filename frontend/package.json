@@ -72,5 +72,8 @@
     "vite": "^5.0.0",
     "wouter": "^3.3.5",
     "zod": "^3.22.4"
+  },
+  "dependencies": {
+    "react-markdown": "^10.1.0"
   }
 }

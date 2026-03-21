@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
 import {
   LineChart,
   Line,
@@ -435,7 +436,7 @@ export default function Dashboard() {
         id: Date.now() + 1,
         role: "ai",
         content: data.response,
-        source: "Gemini API",
+        source: "Deployed LLM",
         liked: null,
       };
       console.log("Adding AI message:", aiMsg);
@@ -530,7 +531,25 @@ export default function Dashboard() {
                       <Brain className="w-3 h-3" />
                       COGNITEX-AI
                     </div>
-                    <p className="text-sm text-neutral-300 leading-relaxed">{msg.content}</p>
+                    <div className="text-sm text-neutral-300 leading-relaxed prose prose-invert prose-sm max-w-none">
+                      <ReactMarkdown
+                        components={{
+                          p: ({ node, ...props }) => <p className="mb-2" {...props} />,
+                          ul: ({ node, ...props }) => <ul className="list-disc list-inside mb-2 ml-2" {...props} />,
+                          ol: ({ node, ...props }) => <ol className="list-decimal list-inside mb-2 ml-2" {...props} />,
+                          li: ({ node, ...props }) => <li className="mb-1" {...props} />,
+                          strong: ({ node, ...props }) => <strong className="font-semibold text-violet-300" {...props} />,
+                          em: ({ node, ...props }) => <em className="italic text-blue-300" {...props} />,
+                          code: ({ node, ...props }) => <code className="bg-neutral-800 px-1.5 py-0.5 rounded text-orange-300 font-mono text-xs" {...props} />,
+                          h1: ({ node, ...props }) => <h1 className="text-lg font-bold mb-2 text-violet-200" {...props} />,
+                          h2: ({ node, ...props }) => <h2 className="text-base font-bold mb-2 text-violet-300" {...props} />,
+                          h3: ({ node, ...props }) => <h3 className="text-sm font-semibold mb-1.5 text-violet-400" {...props} />,
+                          blockquote: ({ node, ...props }) => <blockquote className="border-l-2 border-violet-500 pl-3 italic text-neutral-400 my-2" {...props} />,
+                        }}
+                      >
+                        {msg.content}
+                      </ReactMarkdown>
+                    </div>
                     <div className="flex items-center gap-3 mt-2.5 pt-2 border-t border-neutral-800">
                       <span className="text-[10px] bg-violet-500/15 text-violet-400 border border-violet-500/25 rounded-full px-2 py-0.5 font-mono">
                         Source: {msg.source}
