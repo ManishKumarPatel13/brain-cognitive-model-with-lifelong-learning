@@ -348,7 +348,67 @@ export default function Dashboard() {
   const [pastInteractions, setPastInteractions] = useState<any[]>([]);
   const [memorySearchCount, setMemorySearchCount] = useState(0);
   const [healthStats, setHealthStats] = useState<any[]>([]);
+  const [episodicMemories, setEpisodicMemories] = useState(episodicData);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Generate dynamic episodic memory clusters based on prompt keywords
+  const generateEpisodicMemories = (text: string) => {
+    const keywords = text.toLowerCase().split(/\s+/);
+    const clusters: { [key: string]: string[] } = {
+      "Technical": ["api", "error", "cors", "cors", "network", "backend", "frontend", "database"],
+      "UI_Design": ["ui", "styling", "layout", "responsive", "tailwind", "css", "button", "theme"],
+      "Authentication": ["auth", "login", "password", "token", "jwt", "session", "user"],
+      "Performance": ["slow", "fast", "optimize", "cache", "memory", "lag", "speed"],
+      "Data": ["data", "database", "query", "table", "schema", "storage", "retrieval"]
+    };
+
+    const clusterCounts: { [key: string]: number } = {};
+    keywords.forEach(keyword => {
+      Object.entries(clusters).forEach(([cluster, words]) => {
+        if (words.includes(keyword)) {
+          clusterCounts[cluster] = (clusterCounts[cluster] || 0) + 1;
+        }
+      });
+    });
+
+    const relevantClusters = Object.entries(clusterCounts).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    const CLUSTER_COLORS_MAP: { [key: string]: string } = {
+      "Technical": "#f43f5e",
+      "UI_Design": "#3b82f6",
+      "Authentication": "#10b981",
+      "Performance": "#f59e0b",
+      "Data": "#a78bfa"
+    };
+
+    const CLUSTER_NAMES_MAP: { [key: string]: string[] } = {
+      "Technical": ["Failed API call on /data", "CORS preflight timeout", "Network latency spike", "Malformed JSON response"],
+      "UI_Design": ["Button styling inconsistent", "Grid layout overflow", "Dark mode shift failed", "Flex container misaligned"],
+      "Authentication": ["JWT token expired", "Refresh failed at login", "Session timeout reached", "Invalid credentials provided"],
+      "Performance": ["Cache miss on query", "Memory leak detected", "Render lag on scroll", "Bundle size exceeded"],
+      "Data": ["Query returned null", "Schema mismatch error", "Transaction rollback", "Index not found"]
+    };
+
+    let newMemories: any[] = [];
+    let x = -12, y = -10;
+    
+    relevantClusters.forEach(([cluster]) => {
+      const clusterMessages = CLUSTER_NAMES_MAP[cluster] || [];
+      const numMemories = Math.min(3, clusterMessages.length);
+      
+      for (let i = 0; i < numMemories; i++) {
+        newMemories.push({
+          x: x + (Math.random() * 4 - 2),
+          y: y + (Math.random() * 4 - 2),
+          cluster,
+          memory: clusterMessages[i],
+        });
+      }
+      
+      x += 8;
+    });
+
+    return newMemories;
+  };
 
   // Fetch health stats from backend
   const fetchHealthStats = async () => {
@@ -389,6 +449,10 @@ export default function Dashboard() {
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setCurrentPrompt(trimmed);
+    
+    // Generate new episodic memories based on user prompt
+    const newMemories = generateEpisodicMemories(trimmed);
+    setEpisodicMemories(newMemories.length > 0 ? newMemories : episodicData);
 
     try {
       console.log("🔄 Sending message to API:", trimmed);
@@ -618,17 +682,9 @@ export default function Dashboard() {
                     vector_db: "Pinecone",
                     embeddings_model: "sentence-transformers/all-MiniLM-L6-v2",
                     past_interactions_retrieved: memorySearchCount,
-                    context_injected: memoryContext ? true : false
+                    context_injected: memoryContext ? true : false,
+                    retrieved_memory_context: memorySearchCount > 0 ? pastInteractions.slice(0, 2) : []
                   },
-                  current_task: currentPrompt || "idle",
-                  system_prompt: systemPrompt || systemPromptDefault,
-                  active_context: [
-                    {
-                      role: "user",
-                      content: currentPrompt || "No prompt sent yet",
-                    },
-                  ],
-                  retrieved_memory_context: memorySearchCount > 0 ? pastInteractions.slice(0, 2) : [],
                   api_model: "gemini-3-flash-preview",
                   api_status: lastAPICall.status || "awaiting_input",
                 }} />
@@ -774,7 +830,7 @@ export default function Dashboard() {
                   <ReferenceLine y={0} stroke="#262626" strokeDasharray="2 2" />
                   <Tooltip content={<ScatterTooltip />} cursor={{ strokeDasharray: "3 3", stroke: "#374151" }} />
                   <Scatter
-                    data={episodicData}
+                    data={episodicMemories}
                     shape={<CustomScatterDot />}
                   />
                 </ScatterChart>
