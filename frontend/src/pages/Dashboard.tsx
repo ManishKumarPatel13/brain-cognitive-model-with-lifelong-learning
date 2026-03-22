@@ -327,6 +327,7 @@ export default function Dashboard() {
   const [input, setInput] = useState("");
   const [sleeping, setSleeping] = useState(false);
   const [sleepProgress, setSleepProgress] = useState(0);
+  const [resetting, setResetting] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
   const [lastAPICall, setLastAPICall] = useState<{ timestamp: string; status: string }>({ timestamp: "", status: "" });
@@ -531,6 +532,46 @@ export default function Dashboard() {
         return p + 2;
       });
     }, 60);
+  };
+
+  const handleResetMemory = async () => {
+    if (resetting) return;
+    
+    const confirmed = window.confirm(
+      "🧠 This will delete ALL episodic memory from Pinecone and reset health stats.\n\nAre you sure? This cannot be undone."
+    );
+    if (!confirmed) return;
+
+    setResetting(true);
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/memory/reset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const data = await response.json();
+      
+      if (data.status === "success") {
+        // Reset local state
+        setMessages([]);
+        setHealthStats([]);
+        setEpisodicMemories(episodicData);
+        setMemorySearchCount(0);
+        setPastInteractions([]);
+        setMemoryContext("");
+        
+        alert("✅ Fresh start! All episodic memory cleared.");
+        console.log("✓ Memory reset successful:", data.message);
+      } else {
+        alert("❌ Error resetting memory: " + (data.error || "Unknown error"));
+        console.error("Reset failed:", data);
+      }
+    } catch (error) {
+      console.error("❌ Error calling reset endpoint:", error);
+      alert("❌ Failed to reset memory. Check console for details.");
+    } finally {
+      setResetting(false);
+    }
   };
 
   return (
@@ -743,18 +784,32 @@ export default function Dashboard() {
 
         <div className="flex flex-col overflow-hidden">
           <div className="flex-none px-4 py-3 border-b border-neutral-800 space-y-2">
-            <button
-              onClick={handleSleep}
-              disabled={sleeping}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500/20 to-violet-500/20 border border-cyan-500/30 text-sm font-semibold text-white hover:from-cyan-500/30 hover:to-violet-500/30 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200"
-            >
-              {sleeping ? (
-                <RefreshCw className="w-4 h-4 animate-spin text-cyan-400" />
-              ) : (
-                <Moon className="w-4 h-4 text-cyan-400" />
-              )}
-              {sleeping ? "Consolidating..." : "Initiate Sleep Cycle (Consolidate)"}
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={handleSleep}
+                disabled={sleeping}
+                className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500/20 to-violet-500/20 border border-cyan-500/30 text-sm font-semibold text-white hover:from-cyan-500/30 hover:to-violet-500/30 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200"
+              >
+                {sleeping ? (
+                  <RefreshCw className="w-4 h-4 animate-spin text-cyan-400" />
+                ) : (
+                  <Moon className="w-4 h-4 text-cyan-400" />
+                )}
+                {sleeping ? "Consolidating..." : "Consolidate"}
+              </button>
+              <button
+                onClick={handleResetMemory}
+                disabled={resetting}
+                className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-rose-500/20 to-orange-500/20 border border-rose-500/30 text-sm font-semibold text-white hover:from-rose-500/30 hover:to-orange-500/30 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200"
+              >
+                {resetting ? (
+                  <RefreshCw className="w-4 h-4 animate-spin text-rose-400" />
+                ) : (
+                  <Zap className="w-4 h-4 text-rose-400" />
+                )}
+                {resetting ? "Resetting..." : "Fresh Start"}
+              </button>
+            </div>
             <div className="h-1.5 w-full bg-neutral-800 rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-cyan-500 to-violet-500 rounded-full transition-all duration-100"

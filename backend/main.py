@@ -314,6 +314,38 @@ async def get_health_stats():
         }
 
 
+@app.post("/api/memory/reset")
+async def reset_memory():
+    """Delete all stored data from Pinecone and reset health stats for fresh start."""
+    try:
+        print("🔄 Resetting all episodic memory...")
+        
+        # Delete all vectors from Pinecone index
+        index.delete(delete_all=True)
+        print("✓ All vectors deleted from Pinecone")
+        
+        # Reset health stats file
+        stats_file = "health_stats.json"
+        reset_stats = {"data": []}
+        with open(stats_file, 'w') as f:
+            json.dump(reset_stats, f, indent=2)
+        print("✓ Health stats reset")
+        
+        return {
+            "status": "success",
+            "message": "All episodic memory cleared. Fresh start initialized.",
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        print(f"❌ Error resetting memory: {str(e)}")
+        logger.exception("Error in reset_memory")
+        return {
+            "status": "error",
+            "error": str(e),
+            "message": "Failed to reset memory"
+        }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
