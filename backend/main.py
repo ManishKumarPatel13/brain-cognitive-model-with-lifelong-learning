@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
 from dotenv import load_dotenv
-import google.generativeai as genai
+import requests
 import logging
 from sentence_transformers import SentenceTransformer
 from pinecone import Pinecone, ServerlessSpec
@@ -20,13 +20,19 @@ load_dotenv()
 
 app = FastAPI()
 
-# Configure Gemini API
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY environment variable not set")
+# Configure Hugging Face Inference API
+HF_API_KEY = os.getenv("HF_API_KEY")
+if not HF_API_KEY:
+    raise ValueError("HF_API_KEY environment variable not set")
 
-print(f"✓ Gemini API Key loaded successfully")
-genai.configure(api_key=GEMINI_API_KEY)
+# Multilingual model: bigscience/bloom-1b1 (supports 100+ languages, free tier)
+# Alternative: mistralai/Mistral-7B-Instruct-v0.2 (better quality, English-focused)
+HF_MODEL = "bigscience/bloom-1b1"
+HF_API_URL = f"https://api-inference.huggingface.co/models/{HF_MODEL}"
+HF_HEADERS = {"Authorization": f"Bearer {HF_API_KEY}"}
+
+print(f"✓ Hugging Face API Key loaded successfully")
+print(f"✓ Using multilingual model: {HF_MODEL}")
 
 # Configure Pinecone
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
@@ -229,13 +235,43 @@ async def chat(message: ChatMessage):
         # Step 2: Build enhanced prompt with context
         full_prompt, context_text = build_context_prompt(message.text, past_interactions)
         
-        # Step 3: Send to Gemini
-        print(f"🔄 Sending to Gemini API with memory context...")
-        model = genai.GenerativeModel(model_name="gemini-3-flash-preview")
-        response = model.generate_content(full_prompt)
-        ai_response = response.text
+        # Step 3: Send to Hugging Face Inference API
+        print(f"🔄 Sending to Hugging Face LLM with memory context...")
         
-        print(f"✓ Received response from Gemini")
+        # Prepare payload for HF Inference API
+        payload = {
+            "inputs": full_prompt,
+            "parameters": {
+                "max_new_tokens": 500,
+                "temperature": 0.7,
+                "top_p": 0.9,
+                "repetition_penalty": 1.2,
+            }
+        }
+        
+        # Call Hugging Face Inference API
+        response = requests.post(HF_API_URL, headers=HF_HEADERS, json=payload, timeout=60)
+        
+        if response.status_code != 200:
+            error_msg = response.json().get("error", f"HTTP {response.status_code}")
+            raise Exception(f"HF API Error: {error_msg}")
+        
+        # Extract response text
+        response_data = response.json()
+        
+        # Handle response format from HF API
+        if isinstance(response_data, list) and len(response_data) > 0:
+            ai_response = response_data[0].get("generated_text", "")
+            # Remove the input prompt from response (HF returns full text)
+            if ai_response.startswith(full_prompt):
+                ai_response = ai_response[len(full_prompt):].strip()
+        else:
+            ai_response = str(response_data)
+        
+        if not ai_response:
+            ai_response = "I apologize, but I couldn't generate a response. Please try again."
+        
+        print(f"✓ Received response from Hugging Face LLM")
         
         # Step 4: Save interaction to Pinecone for future reference
         save_interaction(message.text, ai_response)
@@ -250,7 +286,8 @@ async def chat(message: ChatMessage):
             "system_prompt": SYSTEM_PROMPT,
             "context": context_text,
             "memory_search_results": len(past_interactions),
-            "past_interactions": past_interactions
+            "past_interactions": past_interactions,
+            "llm_model": HF_MODEL
         }
     except Exception as e:
         error_msg = str(e)
