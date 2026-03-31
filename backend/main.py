@@ -6,11 +6,11 @@ from dotenv import load_dotenv
 import requests
 from huggingface_hub import InferenceClient
 import logging
-from sentence_transformers import SentenceTransformer
 from pinecone import Pinecone, ServerlessSpec
 from datetime import datetime
 import json
 import random
+import numpy as np
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -32,8 +32,13 @@ HF_MODEL = "mistralai/Mistral-7B-Instruct-v0.2"
 # Use official HuggingFace InferenceClient (handles URL routing automatically)
 hf_client = InferenceClient(model=HF_MODEL, token=HF_API_KEY)
 
+# Embedding model - uses HF API remotely (no local torch/sentence-transformers needed!)
+EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+hf_embed_client = InferenceClient(model=EMBEDDING_MODEL, token=HF_API_KEY)
+
 print(f"✓ Hugging Face API Key loaded successfully")
-print(f"✓ Using model: {HF_MODEL}")
+print(f"✓ Using LLM model: {HF_MODEL}")
+print(f"✓ Using embedding model (remote): {EMBEDDING_MODEL}")
 
 # Configure Pinecone
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
@@ -71,9 +76,7 @@ except Exception as e:
         print(f"✗ Failed to create index: {create_error}")
         raise
 
-# Load embedding model
-print(f"✓ Loading embedding model...")
-embedding_model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+print(f"✓ All services initialized (no heavy local models loaded)")
 
 # System prompt for the AI
 SYSTEM_PROMPT = """You are COGNITEX-AI, an intelligent assistant monitoring a cognitive architecture system. 
@@ -95,8 +98,17 @@ class ChatMessage(BaseModel):
 
 
 def get_embedding(text: str):
-    """Convert text to embedding vector."""
-    return embedding_model.encode(text).tolist()
+    """Convert text to embedding vector using HF Inference API (remote, no local model)."""
+    try:
+        result = hf_embed_client.feature_extraction(text)
+        # Result may be nested list; flatten to 1D vector
+        embedding = np.array(result).flatten().tolist()
+        # Ensure correct dimension (384 for all-MiniLM-L6-v2)
+        return embedding[:384]
+    except Exception as e:
+        print(f"⚠️  Embedding API error: {e}")
+        # Return zero vector as fallback (won't match anything meaningfully)
+        return [0.0] * 384
 
 
 def search_memory(query_text: str, top_k: int = 3):
