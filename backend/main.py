@@ -4,6 +4,7 @@ from pydantic import BaseModel
 import os
 from dotenv import load_dotenv
 import requests
+from huggingface_hub import InferenceClient
 import logging
 from sentence_transformers import SentenceTransformer
 from pinecone import Pinecone, ServerlessSpec
@@ -28,8 +29,9 @@ if not HF_API_KEY:
 # Multilingual model: bigscience/bloom-1b1 (supports 100+ languages, free tier)
 # Alternative: mistralai/Mistral-7B-Instruct-v0.2 (better quality, English-focused)
 HF_MODEL = "bigscience/bloom-1b1"
-HF_API_URL = f"https://router.huggingface.co/models/{HF_MODEL}"
-HF_HEADERS = {"Authorization": f"Bearer {HF_API_KEY}"}
+
+# Use official HuggingFace InferenceClient (handles URL routing automatically)
+hf_client = InferenceClient(model=HF_MODEL, token=HF_API_KEY)
 
 print(f"✓ Hugging Face API Key loaded successfully")
 print(f"✓ Using multilingual model: {HF_MODEL}")
@@ -238,35 +240,18 @@ async def chat(message: ChatMessage):
         # Step 3: Send to Hugging Face Inference API
         print(f"🔄 Sending to Hugging Face LLM with memory context...")
         
-        # Prepare payload for HF Inference API
-        payload = {
-            "inputs": full_prompt,
-            "parameters": {
-                "max_new_tokens": 500,
-                "temperature": 0.7,
-                "top_p": 0.9,
-                "repetition_penalty": 1.2,
-            }
-        }
+        # Use official HuggingFace InferenceClient
+        ai_response = hf_client.text_generation(
+            full_prompt,
+            max_new_tokens=500,
+            temperature=0.7,
+            top_p=0.9,
+            repetition_penalty=1.2,
+        )
         
-        # Call Hugging Face Inference API
-        response = requests.post(HF_API_URL, headers=HF_HEADERS, json=payload, timeout=60)
-        
-        if response.status_code != 200:
-            error_msg = response.json().get("error", f"HTTP {response.status_code}")
-            raise Exception(f"HF API Error: {error_msg}")
-        
-        # Extract response text
-        response_data = response.json()
-        
-        # Handle response format from HF API
-        if isinstance(response_data, list) and len(response_data) > 0:
-            ai_response = response_data[0].get("generated_text", "")
-            # Remove the input prompt from response (HF returns full text)
-            if ai_response.startswith(full_prompt):
-                ai_response = ai_response[len(full_prompt):].strip()
-        else:
-            ai_response = str(response_data)
+        # Clean up response (remove echoed prompt if present)
+        if ai_response and ai_response.startswith(full_prompt):
+            ai_response = ai_response[len(full_prompt):].strip()
         
         if not ai_response:
             ai_response = "I apologize, but I couldn't generate a response. Please try again."
