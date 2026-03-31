@@ -28,7 +28,7 @@ if not HF_API_KEY:
 # Multilingual model: bigscience/bloom-1b1 (supports 100+ languages, free tier)
 # Alternative: mistralai/Mistral-7B-Instruct-v0.2 (better quality, English-focused)
 HF_MODEL = "bigscience/bloom-1b1"
-HF_API_URL = f"https://api-inference.huggingface.co/models/{HF_MODEL}"
+HF_API_URL = f"https://router.huggingface.co/models/{HF_MODEL}"
 HF_HEADERS = {"Authorization": f"Bearer {HF_API_KEY}"}
 
 print(f"✓ Hugging Face API Key loaded successfully")
