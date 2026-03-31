@@ -26,15 +26,14 @@ HF_API_KEY = os.getenv("HF_API_KEY")
 if not HF_API_KEY:
     raise ValueError("HF_API_KEY environment variable not set")
 
-# Multilingual model: bigscience/bloom-1b1 (supports 100+ languages, free tier)
-# Alternative: mistralai/Mistral-7B-Instruct-v0.2 (better quality, English-focused)
-HF_MODEL = "bigscience/bloom-1b1"
+# Use Mistral-7B-Instruct-v0.2: warm on HF free tier, ungated, Apache 2.0, instruct-tuned
+HF_MODEL = "mistralai/Mistral-7B-Instruct-v0.2"
 
 # Use official HuggingFace InferenceClient (handles URL routing automatically)
 hf_client = InferenceClient(model=HF_MODEL, token=HF_API_KEY)
 
 print(f"✓ Hugging Face API Key loaded successfully")
-print(f"✓ Using multilingual model: {HF_MODEL}")
+print(f"✓ Using model: {HF_MODEL}")
 
 # Configure Pinecone
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
@@ -240,18 +239,41 @@ async def chat(message: ChatMessage):
         # Step 3: Send to Hugging Face Inference API
         print(f"🔄 Sending to Hugging Face LLM with memory context...")
         
-        # Use official HuggingFace InferenceClient
-        ai_response = hf_client.text_generation(
-            full_prompt,
-            max_new_tokens=500,
-            temperature=0.7,
-            top_p=0.9,
-            repetition_penalty=1.2,
-        )
-        
-        # Clean up response (remove echoed prompt if present)
-        if ai_response and ai_response.startswith(full_prompt):
-            ai_response = ai_response[len(full_prompt):].strip()
+        # Use chat_completion for instruct model (much better responses)
+        try:
+            messages = [
+                {"role": "system", "content": SYSTEM_PROMPT},
+            ]
+            
+            # Add memory context if available
+            if past_interactions:
+                memory_text = "\n\n📚 Relevant past conversations:\n"
+                for i, interaction in enumerate(past_interactions, 1):
+                    q = interaction.get("question", "")
+                    a = interaction.get("answer", "")[:200]
+                    memory_text += f"\n{i}. Q: {q}\n   A: {a}..."
+                messages.append({"role": "system", "content": f"Context from memory: {memory_text}"})
+            
+            messages.append({"role": "user", "content": message.text})
+            
+            completion = hf_client.chat_completion(
+                messages=messages,
+                max_tokens=500,
+                temperature=0.7,
+                top_p=0.9,
+            )
+            ai_response = completion.choices[0].message.content
+        except Exception as hf_error:
+            print(f"⚠️  chat_completion failed: {hf_error}, trying text_generation fallback...")
+            # Fallback to text_generation
+            ai_response = hf_client.text_generation(
+                full_prompt,
+                max_new_tokens=500,
+                temperature=0.7,
+            )
+            # Clean up response (remove echoed prompt if present)
+            if ai_response and ai_response.startswith(full_prompt):
+                ai_response = ai_response[len(full_prompt):].strip()
         
         if not ai_response:
             ai_response = "I apologize, but I couldn't generate a response. Please try again."
