@@ -26,8 +26,8 @@ HF_API_KEY = os.getenv("HF_API_KEY")
 if not HF_API_KEY:
     raise ValueError("HF_API_KEY environment variable not set")
 
-# Use Mistral-7B-Instruct-v0.2: warm on HF free tier, ungated, Apache 2.0, instruct-tuned
-HF_MODEL = "mistralai/Mistral-7B-Instruct-v0.2"
+# Use Zephyr-7B-beta: warm on HF free tier, instruct-tuned (alternative to Mistral-7B-Instruct-v0.2)
+HF_MODEL = "HuggingFaceH4/zephyr-7b-beta"
 
 # Use official HuggingFace InferenceClient
 # Force task to "conversational" to avoid "not supported for task text-generation" errors
