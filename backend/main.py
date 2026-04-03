@@ -26,19 +26,17 @@ HF_API_KEY = os.getenv("HF_API_KEY")
 if not HF_API_KEY:
     raise ValueError("HF_API_KEY environment variable not set")
 
-# Use Llama-3.2-3B-Instruct: highly supported by multiple free inference providers (Together, Hyperbolic, etc.)
-HF_MODEL = "meta-llama/Llama-3.2-3B-Instruct"
-
-# Use official HuggingFace InferenceClient
-# Force task to "conversational" to avoid "not supported for task text-generation" errors
-hf_client = InferenceClient(model=HF_MODEL, token=HF_API_KEY)
+# Configure Gemini API for Chat
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    print("⚠️ GEMINI_API_KEY environment variable not set. Gemini chat will fail.")
 
 # Embedding model - uses HF API remotely (no local torch/sentence-transformers needed!)
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 hf_embed_client = InferenceClient(model=EMBEDDING_MODEL, token=HF_API_KEY)
 
 print(f"✓ Hugging Face API Key loaded successfully")
-print(f"✓ Using LLM model: {HF_MODEL}")
+print(f"✓ Using LLM model: gemini-2.5-flash (via Google Gemini API)")
 print(f"✓ Using embedding model (remote): {EMBEDDING_MODEL}")
 
 # Configure Pinecone
@@ -249,14 +247,10 @@ async def chat(message: ChatMessage):
         # Step 2: Build enhanced prompt with context
         full_prompt, context_text = build_context_prompt(message.text, past_interactions)
         
-        # Step 3: Send to Hugging Face Inference API
-        print(f"🔄 Sending to Hugging Face LLM with memory context...")
+        # Step 3: Send to Google Gemini API with memory context...
+        print(f"🔄 Sending to Google Gemini LLM with memory context...")
         
-        # Use chat_completion for instruct model (must use conversational task)
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-        ]
-        
+        system_text = SYSTEM_PROMPT
         # Add memory context if available
         if past_interactions:
             memory_text = "\n\n📚 Relevant past conversations:\n"
@@ -264,22 +258,31 @@ async def chat(message: ChatMessage):
                 q = interaction.get("question", "")
                 a = interaction.get("answer", "")[:200]
                 memory_text += f"\n{i}. Q: {q}\n   A: {a}..."
-            messages.append({"role": "system", "content": f"Context from memory: {memory_text}"})
+            system_text += f"\n\nContext from memory:{memory_text}"
+            
+        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+        gemini_payload = {
+            "systemInstruction": {
+                "parts": [{"text": system_text}]
+            },
+            "contents": [
+                {"role": "user", "parts": [{"text": message.text}]}
+            ],
+            "generationConfig": {
+                "temperature": 0.7,
+                "maxOutputTokens": 500
+            }
+        }
         
-        messages.append({"role": "user", "content": message.text})
-        
-        completion = hf_client.chat_completion(
-            messages=messages,
-            max_tokens=500,
-            temperature=0.7,
-            top_p=0.9,
-        )
-        ai_response = completion.choices[0].message.content
+        resp = requests.post(gemini_url, json=gemini_payload)
+        resp.raise_for_status()
+        data = resp.json()
+        ai_response = data["candidates"][0]["content"]["parts"][0]["text"]
         
         if not ai_response:
             ai_response = "I apologize, but I couldn't generate a response. Please try again."
         
-        print(f"✓ Received response from Hugging Face LLM")
+        print(f"✓ Received response from Google Gemini")
         
         # Step 4: Save interaction to Pinecone for future reference
         save_interaction(message.text, ai_response)
@@ -295,7 +298,7 @@ async def chat(message: ChatMessage):
             "context": context_text,
             "memory_search_results": len(past_interactions),
             "past_interactions": past_interactions,
-            "llm_model": HF_MODEL
+            "llm_model": "gemini-2.5-flash"
         }
     except Exception as e:
         error_msg = str(e)
