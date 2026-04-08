@@ -153,10 +153,13 @@ function JsonToken({ value, depth = 0 }: { value: unknown; depth?: number }) {
   return <span className="text-neutral-300">{String(value)}</span>;
 }
 
-const CLUSTER_COLORS: Record<string, string> = {
+const CATEGORY_COLORS: Record<string, string> = {
   API_Errors: "#06b6d4",
-  UI_Styling: "#8b5cf6",
+  UI_Design: "#8b5cf6",
   Auth_Flow: "#f59e0b",
+  Performance: "#ec4899",
+  Data: "#10b981",
+  General: "#6b7280",
 };
 
 function CustomScatterDot(props: {
@@ -165,7 +168,7 @@ function CustomScatterDot(props: {
   payload?: { cluster: string; memory: string };
 }) {
   const { cx = 0, cy = 0, payload } = props;
-  const color = payload ? CLUSTER_COLORS[payload.cluster] ?? "#94a3b8" : "#94a3b8";
+  const color = payload ? CATEGORY_COLORS[payload.cluster] ?? "#94a3b8" : "#94a3b8";
   return (
     <circle
       cx={cx}
@@ -327,6 +330,7 @@ export default function Dashboard() {
   const [input, setInput] = useState("");
   const [sleeping, setSleeping] = useState(false);
   const [sleepProgress, setSleepProgress] = useState(0);
+  const [consolidationStage, setConsolidationStage] = useState("");
   const [resetting, setResetting] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
@@ -360,11 +364,11 @@ export default function Dashboard() {
 
     const relevantClusters = Object.entries(clusterCounts).sort((a, b) => b[1] - a[1]).slice(0, 3);
     const CLUSTER_COLORS_MAP: { [key: string]: string } = {
-      "Technical": "#f43f5e",
-      "UI_Design": "#3b82f6",
-      "Authentication": "#10b981",
-      "Performance": "#f59e0b",
-      "Data": "#a78bfa"
+      "Technical": "#06b6d4",
+      "UI_Design": "#8b5cf6",
+      "Authentication": "#f59e0b",
+      "Performance": "#ec4899",
+      "Data": "#10b981"
     };
 
     const CLUSTER_NAMES_MAP: { [key: string]: string[] } = {
@@ -402,15 +406,26 @@ export default function Dashboard() {
     try {
       const response = await fetch(`${BACKEND_URL}/api/health/stats`);
       const data = await response.json();
-      if (data.data) {
-        // Transform data for chart display
-        const chartData = data.data.map((d: any, idx: number) => ({
-          episode: idx * 10,
-          accuracy: d.accuracy,
-          memory_retrieved: d.memory_retrieved,
-          timestamp: new Date(d.timestamp).toLocaleTimeString()
-        }));
+      if (data.data && data.data.length > 0) {
+        // Transform data for chart display - convert category breakdown to separate series
+        const chartData = data.data.map((d: any, idx: number) => {
+          const point: any = {
+            episode: idx * 10,
+            timestamp: new Date(d.timestamp).toLocaleTimeString(),
+            avg_accuracy: d.avg_accuracy || d.accuracy, // fallback to old field
+          };
+          
+          // Add per-category accuracy if available
+          if (d.accuracy_by_category) {
+            Object.entries(d.accuracy_by_category).forEach(([category, accuracy]) => {
+              point[`${category}_Accuracy`] = accuracy;
+            });
+          }
+          
+          return point;
+        });
         setHealthStats(chartData);
+        console.log("📊 Health stats updated:", chartData);
       }
     } catch (error) {
       console.error("❌ Error fetching health stats:", error);
@@ -518,20 +533,64 @@ export default function Dashboard() {
     );
   };
 
-  const handleSleep = () => {
+  const handleSleep = async () => {
     if (sleeping) return;
     setSleeping(true);
     setSleepProgress(0);
-    const interval = setInterval(() => {
-      setSleepProgress((p) => {
-        if (p >= 100) {
-          clearInterval(interval);
-          setSleeping(false);
-          return 100;
-        }
-        return p + 2;
+    setConsolidationStage("Initializing...");
+
+    try {
+      console.log("🌙 Starting memory consolidation...");
+      const response = await fetch(`${BACKEND_URL}/api/memory/consolidate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
       });
-    }, 60);
+
+      const data = await response.json();
+      console.log("✓ Consolidation response:", data);
+
+      if (data.status === "success") {
+        // Update progress through stages
+        if (data.stages) {
+          for (const stage of data.stages) {
+            setConsolidationStage(stage.name);
+            setSleepProgress(stage.progress);
+            // Small delay between stages for visual effect
+            await new Promise((resolve) => setTimeout(resolve, 400));
+          }
+        }
+
+        // Hold at 100% for a moment
+        setSleepProgress(100);
+        setConsolidationStage("Complete!");
+        await new Promise((resolve) => setTimeout(resolve, 800));
+
+        // Reset local state after successful consolidation
+        setMessages([]);
+        setHealthStats([]);
+        setEpisodicMemories(episodicData);
+        setMemorySearchCount(0);
+        setPastInteractions([]);
+        setMemoryContext("");
+
+        console.log("✅ Consolidation complete:", {
+          interactions_consolidated: data.total_interactions_consolidated,
+          memories_reorganized: data.memories_reorganized,
+        });
+      } else {
+        console.error("❌ Consolidation failed:", data.error);
+        setConsolidationStage("Failed!");
+        alert("❌ Error consolidating memory: " + (data.error || "Unknown error"));
+      }
+    } catch (error) {
+      console.error("❌ Error calling consolidate endpoint:", error);
+      setConsolidationStage("Error!");
+      alert("❌ Failed to consolidate. Check console for details.");
+    } finally {
+      setSleeping(false);
+      setSleepProgress(0);
+      setConsolidationStage("");
+    }
   };
 
   const handleResetMemory = async () => {
@@ -756,25 +815,51 @@ export default function Dashboard() {
                     iconSize={6}
                     wrapperStyle={{ fontSize: "10px", fontFamily: "monospace", paddingTop: "4px" }}
                   />
-                  <Line
-                    type="monotone"
-                    dataKey={healthStats.length > 0 ? "accuracy" : "Task_A_Accuracy"}
-                    stroke="#06b6d4"
-                    strokeWidth={2}
-                    dot={{ r: 3, fill: "#06b6d4", strokeWidth: 0 }}
-                    activeDot={{ r: 4 }}
-                    name={healthStats.length > 0 ? "System Accuracy (with Memory)" : "Task A"}
-                  />
-                  {healthStats.length === 0 && (
-                    <Line
-                      type="monotone"
-                      dataKey="Task_B_Accuracy"
-                      stroke="#8b5cf6"
-                      strokeWidth={2}
-                      dot={{ r: 3, fill: "#8b5cf6", strokeWidth: 0 }}
-                      activeDot={{ r: 4 }}
-                      name="Task B"
-                    />
+                  
+                  {healthStats.length > 0 ? (
+                    // Render category-based lines from real data
+                    Object.entries(CATEGORY_COLORS).map(([category, color]) => {
+                      const dataKey = `${category}_Accuracy`;
+                      // Check if this category exists in data
+                      const hasData = healthStats.some((d: any) => d[dataKey] !== undefined);
+                      if (!hasData) return null;
+                      
+                      return (
+                        <Line
+                          key={dataKey}
+                          type="monotone"
+                          dataKey={dataKey}
+                          stroke={color}
+                          strokeWidth={2}
+                          dot={{ r: 3, fill: color, strokeWidth: 0 }}
+                          activeDot={{ r: 4 }}
+                          name={category}
+                          isAnimationActive={false}
+                        />
+                      );
+                    })
+                  ) : (
+                    // Show demo data
+                    <>
+                      <Line
+                        type="monotone"
+                        dataKey="Task_A_Accuracy"
+                        stroke="#06b6d4"
+                        strokeWidth={2}
+                        dot={{ r: 3, fill: "#06b6d4", strokeWidth: 0 }}
+                        activeDot={{ r: 4 }}
+                        name="Task A"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="Task_B_Accuracy"
+                        stroke="#8b5cf6"
+                        strokeWidth={2}
+                        dot={{ r: 3, fill: "#8b5cf6", strokeWidth: 0 }}
+                        activeDot={{ r: 4 }}
+                        name="Task B"
+                      />
+                    </>
                   )}
                 </LineChart>
               </ResponsiveContainer>
@@ -795,7 +880,7 @@ export default function Dashboard() {
                 ) : (
                   <Moon className="w-4 h-4 text-cyan-400" />
                 )}
-                {sleeping ? "Consolidating..." : "Consolidate"}
+                {sleeping ? consolidationStage || "Consolidating..." : "Consolidate"}
               </button>
               <button
                 onClick={handleResetMemory}
@@ -818,7 +903,7 @@ export default function Dashboard() {
             </div>
             {sleepProgress === 100 && !sleeping && (
               <div className="text-[10px] text-center text-emerald-400 font-mono">
-                ✓ Consolidation complete — memories written to LTM
+                ✓ Consolidation complete — episodic memories reorganized and committed to LTM
               </div>
             )}
           </div>
@@ -841,7 +926,7 @@ export default function Dashboard() {
                 Episodic Memory Clusters
               </span>
               <div className="ml-auto flex items-center gap-3">
-                {Object.entries(CLUSTER_COLORS).map(([k, c]) => (
+                {Object.entries(CATEGORY_COLORS).map(([k, c]) => (
                   <div key={k} className="flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full" style={{ background: c }} />
                     <span className="text-[9px] text-neutral-500 font-mono">{k.replace("_", " ")}</span>
