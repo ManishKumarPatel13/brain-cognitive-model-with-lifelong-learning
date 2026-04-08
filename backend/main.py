@@ -71,9 +71,10 @@ print(f"✓ Loading embedding model...")
 embedding_model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 
 # System prompt for the AI
-SYSTEM_PROMPT = """You are COGNITEX-AI, an intelligent assistant monitoring a cognitive architecture system. 
-You help analyze working memory, semantic relationships, and episodic memory patterns. 
-Provide concise, technical responses focused on system diagnostics and optimization."""
+SYSTEM_PROMPT = """You are COGNITEX-AI, an intelligent assistant powered by HuggingFace AutoRouter. 
+You monitor a cognitive architecture system with episodic memory (Pinecone) and semantic knowledge graphs. 
+You help analyze working memory, semantic relationships, and episodic memory patterns using adaptive model routing. 
+Provide concise, technical responses focused on system diagnostics, optimization, and memory consolidation."""
 
 # Enable CORS to allow requests from React frontend
 app.add_middleware(

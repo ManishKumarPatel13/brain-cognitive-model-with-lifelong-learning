@@ -53,9 +53,10 @@ const workingMemoryData = {
   ],
 };
 
-const systemPromptDefault = `You are COGNITEX-AI, an intelligent assistant monitoring a cognitive architecture system. 
-You help analyze working memory, semantic relationships, and episodic memory patterns. 
-Provide concise, technical responses focused on system diagnostics and optimization.`;
+const systemPromptDefault = `You are COGNITEX-AI, an intelligent assistant powered by HuggingFace AutoRouter. 
+You monitor a cognitive architecture system with episodic memory (Pinecone) and semantic knowledge graphs. 
+You help analyze working memory, semantic relationships, and episodic memory patterns using adaptive model routing. 
+Provide concise, technical responses focused on system diagnostics, optimization, and memory consolidation.`;
 
 const healthData = [
   { episode: 0, Task_A_Accuracy: 98, Task_B_Accuracy: 10 },
