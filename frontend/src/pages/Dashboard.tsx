@@ -831,7 +831,7 @@ export default function Dashboard() {
                     context_injected: memoryContext ? true : false,
                     retrieved_memory_context: memorySearchCount > 0 ? pastInteractions.slice(0, 2) : []
                   },
-                  api_model: "gemini-3-flash-preview",
+                  api_model: "huggingface autorouter",
                   api_status: lastAPICall.status || "awaiting_input",
                 }} />
               </div>
