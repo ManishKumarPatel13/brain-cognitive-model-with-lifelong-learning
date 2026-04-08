@@ -387,6 +387,7 @@ export default function Dashboard() {
   const [pastInteractions, setPastInteractions] = useState<any[]>([]);
   const [memorySearchCount, setMemorySearchCount] = useState(0);
   const [healthStats, setHealthStats] = useState<any[]>([]);
+  const [currentEpisode, setCurrentEpisode] = useState(0);
   const [episodicMemories, setEpisodicMemories] = useState(episodicData);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -473,6 +474,8 @@ export default function Dashboard() {
           return point;
         });
         setHealthStats(chartData);
+        // Update current episode based on the number of data points
+        setCurrentEpisode((chartData.length - 1) * 10);
         console.log("📊 Health stats updated:", chartData);
       }
     } catch (error) {
@@ -616,6 +619,7 @@ export default function Dashboard() {
         // Reset local state after successful consolidation
         setMessages([]);
         setHealthStats([]);
+        setCurrentEpisode(0);
         setEpisodicMemories(episodicData);
         setMemorySearchCount(0);
         setPastInteractions([]);
@@ -662,6 +666,7 @@ export default function Dashboard() {
         // Reset local state
         setMessages([]);
         setHealthStats([]);
+        setCurrentEpisode(0);
         setEpisodicMemories(episodicData);
         setMemorySearchCount(0);
         setPastInteractions([]);
@@ -707,7 +712,7 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-2">
             <span className={`text-xs font-mono ${theme === 'dark' ? 'text-neutral-500' : 'text-gray-400'}`}>EPISODE</span>
-            <span className="text-xs text-cyan-400 font-mono font-bold">50</span>
+            <span className="text-xs text-cyan-400 font-mono font-bold">{currentEpisode}</span>
           </div>
         </div>
       </header>
