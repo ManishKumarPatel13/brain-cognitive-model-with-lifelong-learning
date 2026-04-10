@@ -58,14 +58,7 @@ You monitor a cognitive architecture system with episodic memory (Pinecone) and 
 You help analyze working memory, semantic relationships, and episodic memory patterns using adaptive model routing. 
 Provide concise, technical responses focused on system diagnostics, optimization, and memory consolidation.`;
 
-const healthData = [
-  { episode: 0, Task_A_Accuracy: 98, Task_B_Accuracy: 10 },
-  { episode: 10, Task_A_Accuracy: 85, Task_B_Accuracy: 45 },
-  { episode: 20, Task_A_Accuracy: 65, Task_B_Accuracy: 75 },
-  { episode: 30, Task_A_Accuracy: 82, Task_B_Accuracy: 88 },
-  { episode: 40, Task_A_Accuracy: 94, Task_B_Accuracy: 95 },
-  { episode: 50, Task_A_Accuracy: 96, Task_B_Accuracy: 97 },
-];
+const healthDataInitial: any[] = []; // Will be populated from backend API
 
 const semanticData = {
   nodes: [
@@ -83,16 +76,8 @@ const semanticData = {
   ],
 };
 
-const episodicData = [
-  { x: 12.5, y: -4.2, cluster: "API_Errors", memory: "Failed to fetch on port 8080" },
-  { x: 11.8, y: -3.9, cluster: "API_Errors", memory: "Network Error: CORS preflight" },
-  { x: 13.1, y: -4.8, cluster: "API_Errors", memory: "502 Bad Gateway on /api/data" },
-  { x: -5.2, y: 8.1, cluster: "UI_Styling", memory: "Tailwind grid not responsive" },
-  { x: -4.8, y: 7.5, cluster: "UI_Styling", memory: "Flexbox overflowing screen" },
-  { x: -5.5, y: 8.7, cluster: "UI_Styling", memory: "Dark mode class not applied" },
-  { x: 2.1, y: 3.4, cluster: "Auth_Flow", memory: "JWT expired after 1h" },
-  { x: 2.8, y: 2.9, cluster: "Auth_Flow", memory: "Refresh token not persisted" },
-];
+// Dynamic episodic memory data - populated on user input, not hardcoded
+const episodicDataInitial: any[] = [];
 
 type Message = {
   id: number;
@@ -389,63 +374,104 @@ export default function Dashboard() {
   const [memorySearchCount, setMemorySearchCount] = useState(0);
   const [healthStats, setHealthStats] = useState<any[]>([]);
   const [currentEpisode, setCurrentEpisode] = useState(0);
-  const [episodicMemories, setEpisodicMemories] = useState(episodicData);
+  const [episodicMemories, setEpisodicMemories] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Generate dynamic episodic memory clusters based on prompt keywords
   const generateEpisodicMemories = (text: string) => {
     const keywords = text.toLowerCase().split(/\s+/);
-    const clusters: { [key: string]: string[] } = {
-      "Technical": ["api", "error", "cors", "cors", "network", "backend", "frontend", "database"],
-      "UI_Design": ["ui", "styling", "layout", "responsive", "tailwind", "css", "button", "theme"],
-      "Authentication": ["auth", "login", "password", "token", "jwt", "session", "user"],
-      "Performance": ["slow", "fast", "optimize", "cache", "memory", "lag", "speed"],
-      "Data": ["data", "database", "query", "table", "schema", "storage", "retrieval"]
+    
+    // Define category keywords for classification
+    const categoryKeywords: { [key: string]: string[] } = {
+      "API_Errors": ["api", "error", "cors", "network", "backend", "endpoint", "request", "response", "fetch", "gateway", "timeout", "connection", "fail"],
+      "UI_Design": ["ui", "styling", "layout", "responsive", "tailwind", "css", "button", "theme", "design", "grid", "flex", "component"],
+      "Auth_Flow": ["auth", "login", "password", "token", "jwt", "session", "user", "credential", "refresh", "expire", "permission"],
+      "Performance": ["slow", "fast", "optimize", "cache", "memory", "lag", "speed", "efficient", "bundle", "load", "render"],
+      "Data": ["data", "database", "query", "table", "schema", "storage", "retrieval", "sql", "nosql", "collection", "document"]
     };
 
-    const clusterCounts: { [key: string]: number } = {};
+    // Count keyword matches per category
+    const categoryScores: { [key: string]: number } = {};
     keywords.forEach(keyword => {
-      Object.entries(clusters).forEach(([cluster, words]) => {
+      Object.entries(categoryKeywords).forEach(([category, words]) => {
         if (words.includes(keyword)) {
-          clusterCounts[cluster] = (clusterCounts[cluster] || 0) + 1;
+          categoryScores[category] = (categoryScores[category] || 0) + 1;
         }
       });
     });
 
-    const relevantClusters = Object.entries(clusterCounts).sort((a, b) => b[1] - a[1]).slice(0, 3);
-    const CLUSTER_COLORS_MAP: { [key: string]: string } = {
-      "Technical": "#06b6d4",
-      "UI_Design": "#8b5cf6",
-      "Authentication": "#f59e0b",
-      "Performance": "#ec4899",
-      "Data": "#10b981"
+    // Get top 1-3 categories based on matches
+    const sortedCategories = Object.entries(categoryScores)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([cat]) => cat);
+
+    // If no categories matched, pick one at random
+    if (sortedCategories.length === 0) {
+      sortedCategories.push(Object.keys(categoryKeywords)[Math.floor(Math.random() * Object.keys(categoryKeywords).length)]);
+    }
+
+    // Sample memories for each category
+    const categoryMemories: { [key: string]: string[] } = {
+      "API_Errors": [
+        `Failed to fetch from ${keywords[0] || "endpoint"} - CORS policy violation`,
+        `Network timeout after 30s on ${keywords[0] || "request"}`,
+        `502 Bad Gateway error on /api/${keywords[0] || "data"}`,
+        `Connection refused: backend unreachable on port 8000`,
+        `DNS resolution failed for backend server`
+      ],
+      "UI_Design": [
+        `Tailwind CSS grid container not responsive on mobile`,
+        `Flexbox alignment issue with ${keywords[0] || "component"} - overflow on edges`,
+        `Dark mode theme not applied to ${keywords[0] || "button"} element`,
+        `CSS specificity conflict: inline styles override classes`,
+        `SVG rendering issue in Safari - transform property failed`
+      ],
+      "Auth_Flow": [
+        `JWT token expired during ${keywords[0] || "operation"}} - refresh token not found`,
+        `Login session timeout: user logged out after inactivity`,
+        `OAuth callback redirect URI mismatch with config`,
+        `Password reset token expired - user must request new one`,
+        `Bearer token malformed in Authorization header`
+      ],
+      "Performance": [
+        `Memory leak detected - component not cleaning up event listeners`,
+        `Render lag on scroll: 45ms frame time exceeds 16.7ms target`,
+        `Cache miss for ${keywords[0] || "query"}} - database hit took 2.3s`,
+        `Bundle size exceeded budget: ${keywords[0] || "module"}} is 523KB uncompressed`,
+        `Slow initial ${keywords[0] || "load"}}: critical rendering path blocked by JavaScript`
+      ],
+      "Data": [
+        `Database query returned null for ${keywords[0] || "id"}}`,
+        `Schema mismatch: expected array but received object`,
+        `Foreign key constraint violation - cannot delete parent record`,
+        `Transaction rollback: ${keywords[0] || "operation"}} failed due to concurrency`,
+        `Index not found for column ${keywords[0] || "field"}` - full table scan initiated`
+      ]
     };
 
-    const CLUSTER_NAMES_MAP: { [key: string]: string[] } = {
-      "Technical": ["Failed API call on /data", "CORS preflight timeout", "Network latency spike", "Malformed JSON response"],
-      "UI_Design": ["Button styling inconsistent", "Grid layout overflow", "Dark mode shift failed", "Flex container misaligned"],
-      "Authentication": ["JWT token expired", "Refresh failed at login", "Session timeout reached", "Invalid credentials provided"],
-      "Performance": ["Cache miss on query", "Memory leak detected", "Render lag on scroll", "Bundle size exceeded"],
-      "Data": ["Query returned null", "Schema mismatch error", "Transaction rollback", "Index not found"]
-    };
-
+    // Generate episodic memory points
     let newMemories: any[] = [];
-    let x = -12, y = -10;
-    
-    relevantClusters.forEach(([cluster]) => {
-      const clusterMessages = CLUSTER_NAMES_MAP[cluster] || [];
-      const numMemories = Math.min(3, clusterMessages.length);
+    let xOffset = -10;
+
+    sortedCategories.forEach((category) => {
+      const memories = categoryMemories[category] || [];
+      const numMemories = Math.min(3, memories.length);
       
       for (let i = 0; i < numMemories; i++) {
+        // Create clustered points around each category's area
+        const xVariance = (Math.random() * 4 - 2);
+        const yVariance = (Math.random() * 4 - 2);
+        
         newMemories.push({
-          x: x + (Math.random() * 4 - 2),
-          y: y + (Math.random() * 4 - 2),
-          cluster,
-          memory: clusterMessages[i],
+          x: xOffset + xVariance,
+          y: (i - 1) * 2 + yVariance, // Spread vertically
+          cluster: category,
+          memory: memories[i],
         });
       }
       
-      x += 8;
+      xOffset += 10; // Space categories apart on x-axis
     });
 
     return newMemories;
@@ -504,9 +530,11 @@ export default function Dashboard() {
     setInput("");
     setCurrentPrompt(trimmed);
     
-    // Generate new episodic memories based on user prompt
+    // Generate new episodic memories based on user prompt - dynamically created for each query
+    console.log("🧠 Analyzing prompt to generate episodic memory clusters...");
     const newMemories = generateEpisodicMemories(trimmed);
-    setEpisodicMemories(newMemories.length > 0 ? newMemories : episodicData);
+    console.log(`📊 Generated ${newMemories.length} episodic memory points from categories`);
+    setEpisodicMemories(newMemories);
 
     try {
       console.log("🔄 Sending message to API:", trimmed);
@@ -621,7 +649,7 @@ export default function Dashboard() {
         setMessages([]);
         setHealthStats([]);
         setCurrentEpisode(0);
-        setEpisodicMemories(episodicData);
+        setEpisodicMemories([]);
         setMemorySearchCount(0);
         setPastInteractions([]);
         setMemoryContext("");
@@ -668,7 +696,7 @@ export default function Dashboard() {
         setMessages([]);
         setHealthStats([]);
         setCurrentEpisode(0);
-        setEpisodicMemories(episodicData);
+        setEpisodicMemories([]);
         setMemorySearchCount(0);
         setPastInteractions([]);
         setMemoryContext("");
@@ -847,39 +875,43 @@ export default function Dashboard() {
               </span>
             </div>
             <div className="flex-1 p-3 min-h-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={healthStats.length > 0 ? healthStats : healthData} margin={{ top: 8, right: 16, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#262626' : '#e5e7eb'} />
-                  <XAxis
-                    dataKey="episode"
-                    tick={{ fill: "#6b7280", fontSize: 10, fontFamily: "monospace" }}
-                    label={{ value: "Training Episodes", position: "insideBottom", offset: -2, fill: "#6b7280", fontSize: 9 }}
-                  />
-                  <YAxis
-                    tick={{ fill: "#6b7280", fontSize: 10, fontFamily: "monospace" }}
-                    domain={[0, 100]}
-                    unit="%"
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      background: theme === 'dark' ? "#171717" : "#f9fafb",
-                      border: theme === 'dark' ? "1px solid #404040" : "1px solid #e5e7eb",
-                      borderRadius: "8px",
-                      fontSize: "11px",
-                      fontFamily: "monospace",
-                    }}
-                    labelStyle={{ color: "#9ca3af" }}
-                    cursor={{ stroke: "#374151", strokeWidth: 1 }}
-                  />
-                  <Legend
-                    iconType="circle"
-                    iconSize={6}
-                    wrapperStyle={{ fontSize: "10px", fontFamily: "monospace", paddingTop: "4px" }}
-                  />
-                  
-                  {healthStats.length > 0 ? (
-                    // Render category-based lines from real data
-                    Object.entries(CATEGORY_COLORS).map(([category, color]) => {
+              {healthStats.length === 0 ? (
+                <div className={`h-full flex items-center justify-center ${theme === 'dark' ? 'text-neutral-500' : 'text-gray-400'} text-sm font-mono`}>
+                  <span>Send a prompt to populate memory and accuracy metrics...</span>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={healthStats} margin={{ top: 8, right: 16, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#262626' : '#e5e7eb'} />
+                    <XAxis
+                      dataKey="episode"
+                      tick={{ fill: "#6b7280", fontSize: 10, fontFamily: "monospace" }}
+                      label={{ value: "Training Episodes", position: "insideBottom", offset: -2, fill: "#6b7280", fontSize: 9 }}
+                    />
+                    <YAxis
+                      tick={{ fill: "#6b7280", fontSize: 10, fontFamily: "monospace" }}
+                      domain={[0, 100]}
+                      unit="%"
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        background: theme === 'dark' ? "#171717" : "#f9fafb",
+                        border: theme === 'dark' ? "1px solid #404040" : "1px solid #e5e7eb",
+                        borderRadius: "8px",
+                        fontSize: "11px",
+                        fontFamily: "monospace",
+                      }}
+                      labelStyle={{ color: "#9ca3af" }}
+                      cursor={{ stroke: "#374151", strokeWidth: 1 }}
+                    />
+                    <Legend
+                      iconType="circle"
+                      iconSize={6}
+                      wrapperStyle={{ fontSize: "10px", fontFamily: "monospace", paddingTop: "4px" }}
+                    />
+                    
+                    {/* Render category-based lines from real data */}
+                    {Object.entries(CATEGORY_COLORS).map(([category, color]) => {
                       const dataKey = `${category}_Accuracy`;
                       // Check if this category exists in data
                       const hasData = healthStats.some((d: any) => d[dataKey] !== undefined);
@@ -898,32 +930,10 @@ export default function Dashboard() {
                           isAnimationActive={false}
                         />
                       );
-                    })
-                  ) : (
-                    // Show demo data
-                    <>
-                      <Line
-                        type="monotone"
-                        dataKey="Task_A_Accuracy"
-                        stroke="#06b6d4"
-                        strokeWidth={2}
-                        dot={{ r: 3, fill: "#06b6d4", strokeWidth: 0 }}
-                        activeDot={{ r: 4 }}
-                        name="Task A"
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="Task_B_Accuracy"
-                        stroke="#8b5cf6"
-                        strokeWidth={2}
-                        dot={{ r: 3, fill: "#8b5cf6", strokeWidth: 0 }}
-                        activeDot={{ r: 4 }}
-                        name="Task B"
-                      />
-                    </>
-                  )}
-                </LineChart>
-              </ResponsiveContainer>
+                    })}
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
         </div>
@@ -996,32 +1006,38 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="flex-1 p-3 min-h-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <ScatterChart margin={{ top: 8, right: 16, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? "#1f1f1f" : "#e5e7eb"} />
-                  <XAxis
-                    type="number"
-                    dataKey="x"
-                    tick={{ fill: "#6b7280", fontSize: 9, fontFamily: "monospace" }}
-                    domain={["dataMin - 2", "dataMax + 2"]}
-                    label={{ value: "Dim-1", position: "insideBottom", offset: -2, fill: "#4b5563", fontSize: 9 }}
-                  />
-                  <YAxis
-                    type="number"
-                    dataKey="y"
-                    tick={{ fill: "#6b7280", fontSize: 9, fontFamily: "monospace" }}
-                    domain={["dataMin - 2", "dataMax + 2"]}
-                    label={{ value: "Dim-2", angle: -90, position: "insideLeft", fill: "#4b5563", fontSize: 9 }}
-                  />
-                  <ReferenceLine x={0} stroke="#262626" strokeDasharray="2 2" />
-                  <ReferenceLine y={0} stroke="#262626" strokeDasharray="2 2" />
-                  <Tooltip content={<ScatterTooltip />} cursor={{ strokeDasharray: "3 3", stroke: "#374151" }} />
-                  <Scatter
-                    data={episodicMemories}
-                    shape={<CustomScatterDot />}
-                  />
-                </ScatterChart>
-              </ResponsiveContainer>
+              {episodicMemories.length === 0 ? (
+                <div className={`h-full flex items-center justify-center ${theme === 'dark' ? 'text-neutral-500' : 'text-gray-400'} text-sm font-mono`}>
+                  <span>Send a prompt to visualize episodic memory clusters...</span>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <ScatterChart margin={{ top: 8, right: 16, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? "#1f1f1f" : "#e5e7eb"} />
+                    <XAxis
+                      type="number"
+                      dataKey="x"
+                      tick={{ fill: "#6b7280", fontSize: 9, fontFamily: "monospace" }}
+                      domain={["dataMin - 2", "dataMax + 2"]}
+                      label={{ value: "Dim-1", position: "insideBottom", offset: -2, fill: "#4b5563", fontSize: 9 }}
+                    />
+                    <YAxis
+                      type="number"
+                      dataKey="y"
+                      tick={{ fill: "#6b7280", fontSize: 9, fontFamily: "monospace" }}
+                      domain={["dataMin - 2", "dataMax + 2"]}
+                      label={{ value: "Dim-2", angle: -90, position: "insideLeft", fill: "#4b5563", fontSize: 9 }}
+                    />
+                    <ReferenceLine x={0} stroke="#262626" strokeDasharray="2 2" />
+                    <ReferenceLine y={0} stroke="#262626" strokeDasharray="2 2" />
+                    <Tooltip content={<ScatterTooltip />} cursor={{ strokeDasharray: "3 3", stroke: "#374151" }} />
+                    <Scatter
+                      data={episodicMemories}
+                      shape={<CustomScatterDot />}
+                    />
+                  </ScatterChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
         </div>

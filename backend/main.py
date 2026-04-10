@@ -12,6 +12,13 @@ import json
 import random
 from collections import defaultdict
 import re
+# from whatsapp_handler import (
+#     verify_webhook,
+#     parse_whatsapp_message,
+#     handle_whatsapp_message,
+#     format_cognitex_response_for_whatsapp,
+#     send_whatsapp_message,
+# )
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -88,6 +95,12 @@ app.add_middleware(
 
 class ChatMessage(BaseModel):
     text: str
+
+
+# class WhatsAppWebhook(BaseModel):
+#     """WhatsApp webhook event structure"""
+#     object: str
+#     entry: list
 
 
 def get_embedding(text: str):
@@ -528,6 +541,137 @@ async def consolidate_memory():
             "message": "Memory consolidation failed",
             "timestamp": datetime.now().isoformat()
         }
+
+
+# ==================== WHATSAPP WEBHOOK ENDPOINTS ====================
+# TEMPORARILY DISABLED - STANDBY MODE FOR FUTURE IMPLEMENTATION
+
+# @app.get("/api/whatsapp/webhook")
+# async def verify_whatsapp_webhook(
+#     hub_mode: str = None,
+#     hub_challenge: str = None,
+#     hub_verify_token: str = None
+# ):
+#     """
+#     Verify WhatsApp webhook (GET request)
+#     Called by WhatsApp to verify webhook URL during setup
+#     """
+#     if hub_mode == "subscribe" and hub_verify_token:
+#         if verify_webhook(hub_verify_token):
+#             print(f"✓ WhatsApp webhook verified")
+#             return int(hub_challenge) if hub_challenge.isdigit() else hub_challenge
+#         else:
+#             print(f"✗ Invalid WhatsApp webhook token")
+#             return {"error": "Invalid token"}, 403
+#     
+#     return {"error": "Invalid request"}, 400
+
+
+# async def get_chat_response(text: str):
+#     """Helper function to call chat endpoint synchronously"""
+#     try:
+#         print(f"🔍 Getting COGNITEX response for WhatsApp...")
+#         
+#         # Search memory
+#         past_interactions = search_memory(text, top_k=3)
+#         print(f"✓ Found {len(past_interactions)} similar past interactions")
+#         
+#         # Build enhanced prompt
+#         full_prompt, context_text = build_context_prompt(text, past_interactions)
+#         
+#         # Send to Gemini
+#         model = genai.GenerativeModel(model_name="gemini-3-flash-preview")
+#         response = model.generate_content(full_prompt)
+#         ai_response = response.text
+#         
+#         print(f"✓ Received response from Gemini")
+#         
+#         # Save interaction
+#         save_interaction(text, ai_response)
+#         save_health_stats(past_interactions)
+#         
+#         return {
+#             "response": ai_response,
+#             "status": "success",
+#             "memory_search_results": len(past_interactions),
+#         }
+#     except Exception as e:
+#         error_msg = str(e)
+#         print(f"❌ Error in get_chat_response: {error_msg}")
+#         return {
+#             "response": f"Error: {error_msg}",
+#             "status": "error",
+#             "error": error_msg
+#         }
+
+
+# @app.post("/api/whatsapp/webhook")
+# async def handle_whatsapp_webhook(webhook: WhatsAppWebhook):
+#     """
+#     Handle incoming WhatsApp messages (POST request)
+#     Receives messages, processes through COGNITEX, sends response
+#     """
+#     try:
+#         # Parse message from webhook
+#         message_data = parse_whatsapp_message(webhook.dict())
+#         
+#         if not message_data:
+#             print("ℹ️  Non-message webhook event received")
+#             return {"status": "received"}
+#         
+#         phone_number = message_data["phone_number"]
+#         message_text = message_data["message_text"]
+#         
+#         print(f"\n📱 WhatsApp message from {phone_number}: {message_text}")
+#         
+#         # Get response from COGNITEX
+#         response_data = await get_chat_response(message_text)
+#         
+#         if response_data.get("status") != "success":
+#             error_msg = f"❌ Error: {response_data.get('error', 'Unknown error')}"
+#             send_whatsapp_message(phone_number, error_msg)
+#             return {"status": "error", "error": error_msg}
+#         
+#         # Format and send response
+#         ai_response = response_data.get("response", "No response generated")
+#         whatsapp_response = format_cognitex_response_for_whatsapp(ai_response)
+#         
+#         # Add footer
+#         footer = "\n\n🧠 *COGNITEX-AI*\nPowered by HuggingFace AutoRouter\nMemory: Live"
+#         final_response = whatsapp_response + footer
+#         
+#         # Send via WhatsApp
+#         success = send_whatsapp_message(phone_number, final_response)
+#         
+#         if success:
+#             print(f"✓ Response sent to WhatsApp")
+#             return {"status": "success", "message_sent": True}
+#         else:
+#             print(f"✗ Failed to send WhatsApp response")
+#             return {"status": "error", "message": "Failed to send response"}
+#         
+#     except Exception as e:
+#         error_msg = f"Webhook error: {str(e)}"
+#         print(f"❌ {error_msg}")
+#         logger.exception("Error in WhatsApp webhook")
+#         return {"status": "error", "error": error_msg}
+
+
+# @app.get("/api/whatsapp/status")
+# async def whatsapp_status():
+#     """Check WhatsApp integration status"""
+#     configured = all([
+#         os.getenv("WHATSAPP_BUSINESS_ACCOUNT_ID"),
+#         os.getenv("WHATSAPP_PHONE_NUMBER_ID"),
+#         os.getenv("WHATSAPP_ACCESS_TOKEN"),
+#     ])
+#     
+#     return {
+#         "whatsapp_configured": configured,
+#         "webhook_url": "/api/whatsapp/webhook",
+#         "status": "ready" if configured else "not_configured",
+#         "documentation_url": "/api/docs#whatsapp-setup"
+#     }
 
 
 if __name__ == "__main__":
