@@ -428,7 +428,7 @@ export default function Dashboard() {
         `SVG rendering issue in Safari - transform property failed`
       ],
       "Auth_Flow": [
-        `JWT token expired during ${keywords[0] || "operation"}} - refresh token not found`,
+        `JWT token expired during ${keywords[0] || "operation"} - refresh token not found`,
         `Login session timeout: user logged out after inactivity`,
         `OAuth callback redirect URI mismatch with config`,
         `Password reset token expired - user must request new one`,
@@ -437,16 +437,16 @@ export default function Dashboard() {
       "Performance": [
         `Memory leak detected - component not cleaning up event listeners`,
         `Render lag on scroll: 45ms frame time exceeds 16.7ms target`,
-        `Cache miss for ${keywords[0] || "query"}} - database hit took 2.3s`,
-        `Bundle size exceeded budget: ${keywords[0] || "module"}} is 523KB uncompressed`,
-        `Slow initial ${keywords[0] || "load"}}: critical rendering path blocked by JavaScript`
+        `Cache miss for ${keywords[0] || "query"} - database hit took 2.3s`,
+        `Bundle size exceeded budget: ${keywords[0] || "module"} is 523KB uncompressed`,
+        `Slow initial ${keywords[0] || "load"}: critical rendering path blocked by JavaScript`
       ],
       "Data": [
-        `Database query returned null for ${keywords[0] || "id"}}`,
+        `Database query returned null for ${keywords[0] || "id"}`,
         `Schema mismatch: expected array but received object`,
         `Foreign key constraint violation - cannot delete parent record`,
-        `Transaction rollback: ${keywords[0] || "operation"}} failed due to concurrency`,
-        `Index not found for column ${keywords[0] || "field"}` - full table scan initiated`
+        `Transaction rollback: ${keywords[0] || "operation"} failed due to concurrency`,
+        `Index not found for column ${keywords[0] || "field"} - full table scan initiated`
       ]
     };
 
